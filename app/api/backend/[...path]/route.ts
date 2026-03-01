@@ -1,9 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-// API_BASE is a server-only env var — never sent to the browser
-const API_BASE = process.env.API_BASE ?? 'http://localhost:4000';
+// API_BASE is a server-only env var set in Vercel project settings
+const API_BASE = process.env.API_BASE;
 
 async function handler(req: NextRequest, { params }: { params: { path: string[] } }) {
+  if (!API_BASE) {
+    console.error('[proxy] API_BASE env var is not set');
+    return NextResponse.json(
+      { error: 'API_BASE is not configured on this server' },
+      { status: 503 }
+    );
+  }
+
   const path = '/' + params.path.join('/');
   const url = new URL(req.url);
   const targetUrl = `${API_BASE}${path}${url.search}`;
@@ -19,27 +27,33 @@ async function handler(req: NextRequest, { params }: { params: { path: string[] 
     body = await req.arrayBuffer();
   }
 
-  const response = await fetch(targetUrl, {
-    method: req.method,
-    headers,
-    body,
-    // Don't follow redirects — pass them through
-    redirect: 'manual',
-  });
+  try {
+    const response = await fetch(targetUrl, {
+      method: req.method,
+      headers,
+      body,
+      redirect: 'manual',
+    });
 
-  const resHeaders = new Headers();
-  response.headers.forEach((value, key) => {
-    // Don't forward encoding headers Next.js handles
-    if (!['content-encoding', 'transfer-encoding'].includes(key.toLowerCase())) {
-      resHeaders.set(key, value);
-    }
-  });
+    const resHeaders = new Headers();
+    response.headers.forEach((value, key) => {
+      if (!['content-encoding', 'transfer-encoding'].includes(key.toLowerCase())) {
+        resHeaders.set(key, value);
+      }
+    });
 
-  const resBody = await response.arrayBuffer();
-  return new NextResponse(resBody, {
-    status: response.status,
-    headers: resHeaders,
-  });
+    const resBody = await response.arrayBuffer();
+    return new NextResponse(resBody, {
+      status: response.status,
+      headers: resHeaders,
+    });
+  } catch (err: any) {
+    console.error(`[proxy] Failed to reach ${targetUrl}:`, err?.message ?? err);
+    return NextResponse.json(
+      { error: 'Could not reach the backend API', detail: err?.message },
+      { status: 502 }
+    );
+  }
 }
 
 export const GET = handler;
@@ -48,3 +62,4 @@ export const PUT = handler;
 export const PATCH = handler;
 export const DELETE = handler;
 export const OPTIONS = handler;
+
