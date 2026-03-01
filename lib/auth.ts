@@ -4,7 +4,11 @@ const TOKEN_KEY = 'cwl_access_token';
 const USER_KEY = 'cwl_user';
 
 export function setAuth(accessToken: string, user: any) {
-  Cookies.set(TOKEN_KEY, accessToken, { expires: 1 / 96 }); // ~15 min
+  Cookies.set(TOKEN_KEY, accessToken, {
+    expires: 1 / 96, // ~15 min
+    secure: typeof window !== 'undefined' && window.location.protocol === 'https:',
+    sameSite: 'strict',
+  });
   if (typeof window !== 'undefined') {
     localStorage.setItem(USER_KEY, JSON.stringify(user));
   }

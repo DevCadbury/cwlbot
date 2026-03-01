@@ -1,10 +1,8 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
-  // NEXT_PUBLIC_API_BASE is loaded from:
-  //   Development → .env.local           → http://localhost:4000
-  //   Production  → .env.production      → http://52.191.175.55:4000
-  // Override anytime by setting NEXT_PUBLIC_API_BASE in your shell / CI env.
+  // API_BASE is a server-only env var set in Vercel / .env.local
+  // It is never exposed to the browser — all API calls go through /api/backend proxy
   images: {
     remotePatterns: [
       { protocol: 'https', hostname: 'api-assets.clashofclans.com' },
