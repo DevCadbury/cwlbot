@@ -293,6 +293,7 @@ function SessionDetail({ sessionId, isAdmin, onBack }: { sessionId: string; isAd
       const tags = new Set<string>([
         ...(s.clanList ?? []),
         ...(s.assignments ?? []).map((a: any) => a.clanTag),
+        ...(s.registrations ?? []).flatMap((r: any) => r.userClanTags || []),
       ]);
       const infoMap: Record<string, any> = {};
       await Promise.allSettled([...tags].map(async (tag) => {
@@ -379,6 +380,11 @@ function SessionDetail({ sessionId, isAdmin, onBack }: { sessionId: string; isAd
   const regs: any[] = session.registrations ?? [];
   const assignments: any[] = session.assignments ?? [];
   const clanList: string[] = session.clanList ?? [];
+  // Full list for assign dropdown: session clans + every registered user's linked clans
+  const assignClanList: string[] = [...new Set([
+    ...clanList,
+    ...regs.flatMap((r: any) => r.userClanTags || []),
+  ])];
   const assignmentByTag = new Map<string, any>();
   for (const a of assignments) if (a.playerTag) assignmentByTag.set(a.playerTag, a);
   const assignedCount = regs.filter((r) => assignmentByTag.has(r.playerTag)).length;
@@ -556,7 +562,7 @@ function SessionDetail({ sessionId, isAdmin, onBack }: { sessionId: string; isAd
                   assignment={assignmentByTag.get(reg.playerTag) ?? null}
                   clanInfoMap={clanInfoMap}
                   sessionStatus={session.status}
-                  clanList={clanList}
+                  clanList={assignClanList}
                   onAssign={handleAssign}
                   onUnassign={handleUnassign}
                 />

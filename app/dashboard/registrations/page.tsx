@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   Search, Users, Shield, MessageSquare, Tag, ChevronDown, ChevronUp,
   Swords, RefreshCw, CheckCircle2, X, ChevronRight,
-  Lock, Unlock, Crown, ClipboardPaste, AlertCircle,
+  Lock, Unlock, Crown, ClipboardPaste, AlertCircle, XCircle,
 } from 'lucide-react';
 import Input from '@/components/ui/Input';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
@@ -16,6 +16,7 @@ import {
   apiGetSessionDetail,
   apiAdminAssignPlayer,
   apiAdminAssignMultiple,
+  apiAdminUnassignPlayer,
   apiCloseSession,
   apiReopenSession,
   apiGetMyGroup,
@@ -314,6 +315,7 @@ function AssignPanel({
   registration,
   existingAssignment,
   onDone,
+  onUnassign,
   onClose,
 }: {
   sessionId: string;
@@ -322,6 +324,7 @@ function AssignPanel({
   registration: any;
   existingAssignment?: string;
   onDone: (clanTag: string) => void;
+  onUnassign?: () => void;
   onClose: () => void;
 }) {
   const [selectedClan, setSelectedClan] = useState(existingAssignment || clanList[0] || '');
@@ -389,6 +392,15 @@ function AssignPanel({
           {saving ? <RefreshCw className="w-3 h-3 animate-spin" /> : <CheckCircle2 className="w-3 h-3" />}
           {saving ? 'Saving…' : 'Save'}
         </button>
+        {existingAssignment && onUnassign && (
+          <button
+            onClick={onUnassign}
+            disabled={saving}
+            className="text-xs px-3 py-1.5 rounded-lg border border-rose-200 text-rose-600 hover:bg-rose-50 font-medium flex items-center gap-1.5 disabled:opacity-50"
+          >
+            <XCircle className="w-3 h-3" /> Unassign
+          </button>
+        )}
         {err && <span className="text-xs text-red-500">{err}</span>}
       </div>
     </div>
@@ -399,23 +411,42 @@ function SessionRegistrationRow({
   reg,
   assignment,
   sessionId,
+  sessionStatus,
   clanList,
   clanInfoMap,
   onAssigned,
+  onUnassigned,
 }: {
   reg: any;
   assignment?: string;
   sessionId: string;
+  sessionStatus: string;
   clanList: string[];
   clanInfoMap: Map<string, any>;
   onAssigned: (playerTag: string, clanTag: string) => void;
+  onUnassigned: (playerTag: string) => void;
 }) {
   const [assigning, setAssigning] = useState(false);
+  const [unassigning, setUnassigning] = useState(false);
   const pd = reg.playerData;
+  const canAssign = sessionStatus === 'open' && clanList.length > 0;
 
   function handleDone(clanTag: string) {
     setAssigning(false);
     onAssigned(reg.playerTag, clanTag);
+  }
+
+  async function handleUnassign() {
+    setUnassigning(true);
+    setAssigning(false);
+    try {
+      await apiAdminUnassignPlayer(sessionId, reg.userPhone, reg.playerTag);
+      onUnassigned(reg.playerTag);
+    } catch (e: any) {
+      alert(e.message || 'Failed to unassign');
+    } finally {
+      setUnassigning(false);
+    }
   }
 
   return (
@@ -464,7 +495,20 @@ function SessionRegistrationRow({
           ) : (
             <span className="text-xs text-slate-400 italic">Unassigned</span>
           )}
-          {/* Assign button disabled */}
+          {canAssign && (
+            <button
+              onClick={() => setAssigning((v) => !v)}
+              disabled={unassigning}
+              className={`text-xs px-2.5 py-1 rounded-lg border font-medium transition flex items-center gap-1 ${
+                assigning
+                  ? 'bg-indigo-100 border-indigo-300 text-indigo-700'
+                  : 'bg-white border-slate-200 text-slate-600 hover:border-indigo-300 hover:bg-indigo-50'
+              } disabled:opacity-50`}
+            >
+              {unassigning ? <RefreshCw className="w-3 h-3 animate-spin" /> : <Swords className="w-3 h-3" />}
+              {assigning ? 'Cancel' : assignment ? 'Change' : 'Assign'}
+            </button>
+          )}
         </div>
       </div>
 
@@ -476,6 +520,7 @@ function SessionRegistrationRow({
           registration={reg}
           existingAssignment={assignment}
           onDone={handleDone}
+          onUnassign={assignment ? handleUnassign : undefined}
           onClose={() => setAssigning(false)}
         />
       )}
@@ -762,11 +807,14 @@ function CwlSessionsTab() {
 
       // Load clan info for all clans:
       //   1. session's explicit clanList
-      //   2. current in-game clans of registered players
+      //   2. current in-game clans of registered players + their dashboard-linked clans
       //   3. already-assigned clans (so all known clans appear in the picker)
       const sessionTags: string[] = res.session?.clanList || [];
       const regClanTags: string[] = (res.session?.registrations || [])
-        .map((r: any) => r.playerData?.clan?.tag)
+        .flatMap((r: any) => [
+          r.playerData?.clan?.tag,
+          ...(r.userClanTags || []),
+        ])
         .filter(Boolean);
       const assignedTags: string[] = (res.session?.assignments || [])
         .map((a: any) => a.clanTag)
@@ -831,6 +879,14 @@ function CwlSessionsTab() {
 
   function handleAssigned(playerTag: string, clanTag: string) {
     setAssignmentMap((prev) => new Map(prev).set(playerTag, clanTag));
+  }
+
+  function handleUnassigned(playerTag: string) {
+    setAssignmentMap((prev) => {
+      const next = new Map(prev);
+      next.delete(playerTag);
+      return next;
+    });
   }
 
   function handleBulkDone(updates: Array<{ userPhone: string; playerTag?: string; clanTag: string }>) {
@@ -910,7 +966,15 @@ function CwlSessionsTab() {
                   </p>
                 </div>
                 <div className="flex items-center gap-2 flex-wrap">
-                  {/* Bulk Assign button disabled */}
+                  {detail.status === 'open' && clanList.length > 0 && (
+                    <button
+                      onClick={() => setShowBulk((v) => !v)}
+                      className="text-sm px-3 py-1.5 rounded-lg border border-indigo-200 text-indigo-600 hover:bg-indigo-50 font-medium flex items-center gap-1.5"
+                    >
+                      <Shield className="w-3.5 h-3.5" />
+                      Bulk Assign
+                    </button>
+                  )}
                   <button
                     onClick={() => loadDetail(selectedSessionId!)}
                     className="text-sm px-3 py-1.5 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 flex items-center gap-1"
@@ -950,7 +1014,7 @@ function CwlSessionsTab() {
 
               {/* Bulk assign panel disabled */}
               <AnimatePresence>
-                {false && (
+                {showBulk && (
                   <motion.div
                     key="bulk"
                     initial={{ opacity: 0, y: -8 }}
@@ -987,9 +1051,11 @@ function CwlSessionsTab() {
                         reg={r}
                         assignment={assignmentMap.get(key)}
                         sessionId={selectedSessionId}
+                        sessionStatus={detail.status}
                         clanList={clanList}
                         clanInfoMap={clanInfoMap}
                         onAssigned={handleAssigned}
+                        onUnassigned={handleUnassigned}
                       />
                     );
                   })}
