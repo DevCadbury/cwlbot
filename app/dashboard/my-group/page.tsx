@@ -263,19 +263,10 @@ function GroupSessionPanel({
   // Seed cache from page clanInfoMap
   useEffect(() => { seedClanCache(clanInfoMap); }, [clanInfoMap]);
 
-  // Available clan tags for assignment: session clanList + all group clans + member userClans
+  // Available clan tags for assignment: session clanList only (admins add clans via bot)
   const availableClanTags = useMemo(() => {
-    const set = new Set<string>(session?.clanList || []);
-    // Include every clan known in the group's clanInfoMap (covers all followed clans)
-    for (const tag of Object.keys(clanInfoMap)) set.add(tag);
-    for (const m of resolvedMembers) {
-      for (const c of m.userClans || []) set.add(c.clanTag);
-      for (const ep of m.enrichedPlayers || []) {
-        if (ep.playerData?.clan?.tag) set.add(ep.playerData.clan.tag);
-      }
-    }
-    return [...set];
-  }, [session, resolvedMembers, clanInfoMap]);
+    return [...new Set<string>(session?.clanList || [])];
+  }, [session]);
 
   async function handleReopen() {
     if (!session?._id) return;

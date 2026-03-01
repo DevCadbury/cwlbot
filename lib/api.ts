@@ -234,6 +234,17 @@ export async function apiAdminAssignPlayer(
   });
 }
 
+export async function apiAdminUnassignPlayer(
+  sessionId: string,
+  userPhone: string,
+  playerTag?: string
+) {
+  return apiFetch<{ success: boolean; session: any }>(`/admin/sessions/${encodeURIComponent(sessionId)}/unassign`, {
+    method: 'POST',
+    body: JSON.stringify({ userPhone, playerTag }),
+  });
+}
+
 export async function apiAdminAssignMultiple(
   sessionId: string,
   assignments: Array<{ userPhone: string; playerTag?: string; clanTag: string }>

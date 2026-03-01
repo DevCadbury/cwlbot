@@ -112,7 +112,7 @@ function SessionCard({ session, onClick }: { session: any; onClick?: () => void 
 // ─── Player Registration Card ─────────────────────────────────────────────────
 
 function PlayerCard({
-  reg, assignment, clanInfoMap, sessionStatus, clanList, onAssign,
+  reg, assignment, clanInfoMap, sessionStatus, clanList, onAssign, onUnassign,
 }: {
   reg: any;
   assignment: any;
@@ -120,6 +120,7 @@ function PlayerCard({
   sessionStatus: string;
   clanList: string[];
   onAssign: (playerTag: string, userPhone: string, clanTag: string) => Promise<void>;
+  onUnassign: (playerTag: string, userPhone: string) => Promise<void>;
 }) {
   const [open, setOpen] = useState(false);
   const [assigning, setAssigning] = useState(false);
@@ -130,6 +131,12 @@ function PlayerCard({
   const handleAssign = async (clanTag: string) => {
     setAssigning(true);
     try { await onAssign(reg.playerTag, reg.userPhone, clanTag); setOpen(false); }
+    finally { setAssigning(false); }
+  };
+
+  const handleUnassign = async () => {
+    setAssigning(true);
+    try { await onUnassign(reg.playerTag, reg.userPhone); setOpen(false); }
     finally { setAssigning(false); }
   };
 
@@ -180,7 +187,16 @@ function PlayerCard({
             <div className="bg-slate-50 px-3 py-2 flex items-center gap-2 flex-wrap">
               {assigning ? (
                 <span className="text-xs text-slate-400 flex items-center gap-1"><LoadingSpinner size="sm" /> assigning…</span>
-              ) : clanList.map((tag) => {
+              ) : <>
+                {assignment && (
+                  <button
+                    onClick={handleUnassign}
+                    className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium border bg-rose-50 text-rose-700 border-rose-200 hover:bg-rose-100 transition-all"
+                  >
+                    <XCircle className="w-3.5 h-3.5" /> Unassign
+                  </button>
+                )}
+                {clanList.map((tag) => {
                 const ci = clanInfoMap[tag];
                 const isActive = assignment?.clanTag === tag;
                 return (
@@ -196,6 +212,7 @@ function PlayerCard({
                   </button>
                 );
               })}
+              </>}
             </div>
           </motion.div>
         )}
@@ -295,6 +312,12 @@ function SessionDetail({ sessionId, isAdmin, onBack }: { sessionId: string; isAd
   const handleAssign = async (playerTag: string, userPhone: string, clanTag: string) => {
     const { apiAdminAssignPlayer } = await import('@/lib/api');
     await apiAdminAssignPlayer(sessionId, userPhone, clanTag, playerTag);
+    await loadDetail();
+  };
+
+  const handleUnassign = async (playerTag: string, userPhone: string) => {
+    const { apiAdminUnassignPlayer } = await import('@/lib/api');
+    await apiAdminUnassignPlayer(sessionId, userPhone, playerTag);
     await loadDetail();
   };
 
@@ -535,6 +558,7 @@ function SessionDetail({ sessionId, isAdmin, onBack }: { sessionId: string; isAd
                   sessionStatus={session.status}
                   clanList={clanList}
                   onAssign={handleAssign}
+                  onUnassign={handleUnassign}
                 />
               ))}
             </div>
