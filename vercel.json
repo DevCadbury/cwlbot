@@ -1,4 +1,11 @@
 {
-  "regions": ["iad1"],
-  "framework": "nextjs"
+  "framework": "nextjs",
+  "build": {
+    "env": {
+      "API_BASE": "http://52.191.175.55:4000"
+    }
+  },
+  "env": {
+    "API_BASE": "http://52.191.175.55:4000"
+  }
 }
