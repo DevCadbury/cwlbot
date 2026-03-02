@@ -1,4 +1,4 @@
 {
-  "regions": ["iad1"],
-  "framework": "nextjs"
+  "framework": "nextjs",
+  "nodeVersion": "20.x"
 }
