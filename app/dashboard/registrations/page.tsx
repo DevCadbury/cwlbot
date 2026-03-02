@@ -75,6 +75,53 @@ function StatusBadge({ status }: { status: string }) {
   );
 }
 
+/**
+ * ClanBadge — displays a clan tag with its CoC badge and name.
+ * Fetches clan info lazily from the CoC API so the user sees name + icon instead
+ * of a raw tag string like "#20P292Q2V".
+ */
+function ClanBadge({ tag }: { tag: string }) {
+  const [info, setInfo] = useState<{ name: string; badgeUrl: string; level?: number } | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    apiGetClanInfo(tag)
+      .then((d: any) => {
+        if (!cancelled && d?.tag) {
+          setInfo({ name: d.name || tag, badgeUrl: d.badgeUrl || '', level: d.level });
+        }
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [tag]);
+
+  return (
+    <span className="inline-flex items-center gap-1.5 text-xs bg-amber-50 text-amber-800 border border-amber-200 rounded-full px-2.5 py-0.5 font-medium max-w-[160px]">
+      {info?.badgeUrl
+        ? <img src={info.badgeUrl} alt="" className="w-4 h-4 object-contain flex-shrink-0" />
+        : <Shield className="w-3.5 h-3.5 text-amber-500 flex-shrink-0" />
+      }
+      <span className="truncate">{info ? info.name : tag}</span>
+      {info?.level && <span className="text-amber-500 flex-shrink-0">Lv.{info.level}</span>}
+    </span>
+  );
+}
+
+/**
+ * GroupChatPill — displays a verified WhatsApp group ID in a readable format.
+ * Shows the last 6 digits of the group ID so it's identifiable without being
+ * completely opaque (full IDs like "120363370354490104@g.us" aren't human-readable).
+ */
+function GroupChatPill({ id }: { id: string }) {
+  const short = id.replace('@g.us', '').slice(-8);
+  return (
+    <span className="inline-flex items-center gap-1 text-xs bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-full px-2.5 py-0.5 font-medium" title={id}>
+      <MessageSquare className="w-3 h-3 flex-shrink-0" />
+      ...{short}
+    </span>
+  );
+}
+
 // ─── Users Tab ──────────────────────────────────────────────────────────────
 
 function RegistrationRow({ user }: { user: any }) {
@@ -161,7 +208,7 @@ function RegistrationRow({ user }: { user: any }) {
             <div>
               <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Verified WhatsApp Groups</p>
               <div className="flex flex-wrap gap-2">
-                {verifiedChats.map((id) => <TagPill key={id} tag={id} color="emerald" />)}
+                {verifiedChats.map((id) => <GroupChatPill key={id} id={id} />)}
               </div>
             </div>
           )}
@@ -170,8 +217,8 @@ function RegistrationRow({ user }: { user: any }) {
               <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Dashboard Clans</p>
               <div className="flex flex-wrap gap-2">
                 {userClans.map((c: any) => (
-                  <div key={c.clanTag} className="flex items-center gap-1">
-                    <TagPill tag={c.clanTag} color="amber" />
+                  <div key={c.clanTag} className="flex items-center gap-1.5">
+                    <ClanBadge tag={c.clanTag} />
                     <span className="text-xs text-slate-400">{new Date(c.addedAt).toLocaleDateString()}</span>
                   </div>
                 ))}
@@ -490,9 +537,18 @@ function SessionRegistrationRow({
 
         {/* Assignment status + button */}
         <div className="flex items-center gap-2 flex-shrink-0">
-          {assignment ? (
-            <TagPill tag={assignment} color="emerald" />
-          ) : (
+          {assignment ? (() => {
+            const ci = clanInfoMap.get(assignment);
+            return (
+              <span className="inline-flex items-center gap-1.5 text-xs bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-full px-2.5 py-0.5 font-medium max-w-[130px]">
+                {ci?.badgeUrl
+                  ? <img src={ci.badgeUrl} alt="" className="w-4 h-4 object-contain flex-shrink-0" />
+                  : <Shield className="w-3 h-3 text-emerald-500 flex-shrink-0" />
+                }
+                <span className="truncate">{ci?.name || assignment}</span>
+              </span>
+            );
+          })() : (
             <span className="text-xs text-slate-400 italic">Unassigned</span>
           )}
           {canAssign && (

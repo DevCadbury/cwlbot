@@ -68,7 +68,7 @@ function SessionCard({ session, onClick }: { session: any; onClick?: () => void 
       <div className="flex items-start justify-between gap-2 mb-4">
         <div className="min-w-0">
           <p className="font-bold text-slate-800 text-sm leading-tight truncate">
-            {session.chatID?.replace('@g.us', '') ?? session._id?.slice(-8)}
+            {session.groupTitle ?? session.chatID?.replace('@g.us', '') ?? session._id?.slice(-8)}
           </p>
           <p className="text-[11px] text-slate-400 font-mono mt-0.5">{session._id?.slice(-10)}</p>
         </div>
@@ -347,7 +347,7 @@ function SessionDetail({ sessionId, isAdmin, onBack }: { sessionId: string; isAd
     try {
       const dataUrl = await toPng(exportRef.current, { cacheBust: true, pixelRatio: 2, skipFonts: true });
       const link = document.createElement('a');
-      const chatId = session.chatID?.replace('@g.us', '') ?? sessionId.slice(-10);
+      const chatId = session.groupTitle ?? session.chatID?.replace('@g.us', '') ?? sessionId.slice(-10);
       link.download = `cwl-${chatId}-${new Date().toISOString().slice(0, 10)}.png`;
       link.href = dataUrl;
       link.click();
@@ -413,7 +413,7 @@ function SessionDetail({ sessionId, isAdmin, onBack }: { sessionId: string; isAd
             <ChevronLeft className="w-4 h-4" /> Sessions
           </button>
           <span className="text-slate-300">/</span>
-          <span className="text-slate-600 font-mono">{session.chatID?.replace('@g.us', '') ?? sessionId.slice(-10)}</span>
+          <span className="text-slate-600 font-mono">{session.groupTitle ?? session.chatID?.replace('@g.us', '') ?? sessionId.slice(-10)}</span>
         </div>
         <div className="flex items-center gap-2">
           <button
