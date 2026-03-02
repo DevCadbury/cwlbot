@@ -21,6 +21,7 @@ import {
   apiReopenSession,
   apiGetMyGroup,
   apiGetClanInfo,
+  apiGetPlayerInfo,
 } from '@/lib/api';
 
 // ─── Shared Helpers ──────────────────────────────────────────────────────────
@@ -72,6 +73,85 @@ function StatusBadge({ status }: { status: string }) {
     <span className={`text-xs px-2 py-0.5 rounded-full border font-medium ${map[status] || map.closed}`}>
       {status}
     </span>
+  );
+}
+
+/**
+ * PlayerBadge — displays a player tag with their CoC info:
+ * town hall icon, player name, league badge, and trophies.
+ * Fetches lazily from the CoC API; falls back to the raw tag on error.
+ */
+function PlayerBadge({ tag, note }: { tag: string; note?: string }) {
+  const [info, setInfo] = useState<{
+    name: string;
+    townHallLevel: number;
+    trophies?: number;
+    league?: { name: string; iconUrls?: { small?: string } };
+    clan?: { name: string; tag: string };
+  } | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    apiGetPlayerInfo(tag)
+      .then((d: any) => {
+        if (!cancelled && d?.name) {
+          setInfo({
+            name: d.name,
+            townHallLevel: d.townHallLevel ?? 1,
+            trophies: d.trophies,
+            league: d.league,
+            clan: d.clan,
+          });
+        }
+      })
+      .catch(() => {})
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
+  }, [tag]);
+
+  const th = Math.min(Math.max(info?.townHallLevel ?? 1, 1), 18);
+
+  return (
+    <div className="flex items-center gap-2 py-1.5 px-3 bg-indigo-50 border border-indigo-200 rounded-xl min-w-0">
+      {/* TH Icon */}
+      <img
+        src={`/townhalls/th-${th}.png`}
+        alt={`TH${th}`}
+        title={`Town Hall ${th}`}
+        className="w-8 h-8 object-contain flex-shrink-0"
+        onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+      />
+      <div className="min-w-0">
+        <div className="flex items-center gap-1.5 flex-wrap">
+          {/* Player name or tag fallback */}
+          <span className="text-sm font-semibold text-slate-800 truncate">
+            {loading ? <span className="text-slate-400 italic text-xs">{tag}</span> : (info?.name ?? tag)}
+          </span>
+          {/* League badge */}
+          {info?.league?.iconUrls?.small && (
+            <img src={info.league.iconUrls.small} alt={info.league.name} className="w-4 h-4" />
+          )}
+          {/* Trophies */}
+          {info?.trophies !== undefined && (
+            <span className="text-xs text-amber-600 font-medium">🏆 {info.trophies}</span>
+          )}
+        </div>
+        <div className="flex items-center gap-2 flex-wrap">
+          {/* Player tag */}
+          <span className="text-xs text-indigo-500 font-mono">{tag}</span>
+          {/* Clan name */}
+          {info?.clan?.name && (
+            <span className="text-xs text-slate-400 truncate">in {info.clan.name}</span>
+          )}
+          {/* Source note (synced from bot etc) */}
+          {note && note !== 'synced from bot' && (
+            <span className="text-xs text-slate-400 italic">{note}</span>
+          )}
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -195,10 +275,9 @@ function RegistrationRow({ user }: { user: any }) {
               <div className="space-y-2">
                 {allPlayerTags.map((p: any) => (
                   <div key={p.playerTag} className="flex flex-wrap items-center gap-2">
-                    <TagPill tag={p.playerTag} color="indigo" />
-                    {p.clanTag && <span className="text-xs text-slate-400">clan: <TagPill tag={p.clanTag} color="emerald" /></span>}
-                    {p.assignedClanTag && <span className="text-xs text-slate-400">assigned: <TagPill tag={p.assignedClanTag} color="amber" /></span>}
-                    {p.note && <span className="text-xs text-slate-400 italic">"{p.note}"</span>}
+                    <PlayerBadge tag={p.playerTag} note={p.note} />
+                    {p.clanTag && <span className="text-xs text-slate-400">clan: <ClanBadge tag={p.clanTag} /></span>}
+                    {p.assignedClanTag && <span className="text-xs text-slate-400">assigned: <ClanBadge tag={p.assignedClanTag} /></span>}
                   </div>
                 ))}
               </div>

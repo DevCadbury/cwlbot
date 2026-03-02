@@ -366,6 +366,16 @@ export async function apiGetClanInfo(clanTag: string) {
   return res.clan;
 }
 
+/**
+ * Fetch basic player info (name, TH level, league, trophies) from CoC API.
+ * Used to display rich player cards instead of raw tags on the registrations page.
+ */
+export async function apiGetPlayerInfo(playerTag: string) {
+  const tag = encodeURIComponent(playerTag.replace('#', ''));
+  const res = await apiFetch<{ player: any }>(`/users/me/players/${tag}/live`);
+  return res.player;
+}
+
 /** Fetch current war for a clan */
 export async function apiGetClanWar(clanTag: string) {
   const tag = clanTag.replace('#', '');
