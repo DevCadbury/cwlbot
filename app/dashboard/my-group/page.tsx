@@ -7,7 +7,8 @@ import {
   Users, CheckCircle, XCircle, Search, Shield, RefreshCw,
   KeyRound, ChevronRight, X, Crown, Star, Swords, Trophy,
   SlidersHorizontal, User, Bot, Unlock, Lock, CheckCircle2,
-  ChevronDown,
+  ChevronDown, Link2, BellRing, Clock, ToggleLeft, ToggleRight,
+  CheckSquare, AlertTriangle,
 } from 'lucide-react';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import {
@@ -19,6 +20,9 @@ import {
   apiAdminAssignPlayer,
   apiAdminAssignMultiple,
   apiGetClanInfo,
+  apiGetGroupLinkLogs,
+  apiGetGroupReminder,
+  apiUpdateGroupReminder,
 } from '@/lib/api';
 import { useAuth } from '@/hooks/useAuth';
 
@@ -1307,6 +1311,210 @@ function UnverifiedMembersGrid({
   );
 }
 
+// ─── GroupLinkLogsPanel ───────────────────────────────────────────────────────
+
+function GroupLinkLogsPanel({ chatID }: { chatID: string }) {
+  const [logs, setLogs] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [err, setErr] = useState('');
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    apiGetGroupLinkLogs(chatID)
+      .then((res: any) => { if (!cancelled) setLogs(res.logs ?? []); })
+      .catch((e: any) => { if (!cancelled) setErr(e.message || 'Failed to load logs'); })
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
+  }, [chatID]);
+
+  const ACTION_LABEL: Record<string, { label: string; color: string }> = {
+    group_linked:          { label: 'Linked',           color: 'text-emerald-600 bg-emerald-50 border-emerald-200' },
+    group_linked_existing: { label: 'Linked (existing)',color: 'text-blue-600 bg-blue-50 border-blue-200' },
+    group_unlinked:        { label: 'Unlinked',         color: 'text-red-600 bg-rose-50 border-rose-200' },
+    group_verified:        { label: 'Group Verified',   color: 'text-indigo-600 bg-indigo-50 border-indigo-200' },
+    group_unverified:      { label: 'Group Unverified', color: 'text-amber-600 bg-amber-50 border-amber-200' },
+  };
+
+  if (loading) return <div className="flex justify-center py-8"><LoadingSpinner size="sm" /></div>;
+  if (err) return <p className="text-sm text-red-500 text-center py-6">{err}</p>;
+
+  return (
+    <div className="space-y-3">
+      <p className="text-xs text-slate-500 dark:text-slate-400">
+        Showing the last {logs.length} events for this group.
+      </p>
+      {logs.length === 0 ? (
+        <div className="text-center py-10 bg-white/60 dark:bg-slate-800/60 rounded-2xl border border-slate-200 dark:border-slate-700">
+          <Link2 size={32} className="mx-auto text-slate-300 dark:text-slate-600 mb-2" />
+          <p className="text-slate-500 dark:text-slate-400 text-sm">No linking events yet.</p>
+        </div>
+      ) : (
+        <div className="space-y-1.5">
+          {logs.map((log: any, i: number) => {
+            const info = ACTION_LABEL[log.action] ?? { label: log.action, color: 'text-slate-600 bg-slate-50 border-slate-200' };
+            const ts = log.timestamp ? new Date(log.timestamp) : null;
+            const via = log.payload?.via;
+            return (
+              <div
+                key={log._id || i}
+                className="flex items-start gap-3 bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 px-4 py-3"
+              >
+                <span className={`flex-shrink-0 text-[10px] font-bold px-2 py-0.5 rounded-full border mt-0.5 ${info.color}`}>
+                  {info.label}
+                </span>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-slate-800 dark:text-slate-200 truncate">
+                    {log.userPhone}
+                  </p>
+                  {via && (
+                    <p className="text-xs text-slate-400 mt-0.5">via {via}</p>
+                  )}
+                </div>
+                {ts && (
+                  <div className="flex-shrink-0 text-right">
+                    <p className="text-xs text-slate-500 dark:text-slate-400">{ts.toLocaleDateString()}</p>
+                    <p className="text-[10px] text-slate-400">{ts.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── GroupReminderPanel ───────────────────────────────────────────────────────
+
+function GroupReminderPanel({ chatID }: { chatID: string }) {
+  const [reminder, setReminder] = useState({ enabled: false, hoursBeforeEnd: 4, message: '' });
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [err, setErr] = useState('');
+  const [saved, setSaved] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    apiGetGroupReminder(chatID)
+      .then((res: any) => { if (!cancelled) setReminder(res.reminder ?? { enabled: false, hoursBeforeEnd: 4, message: '' }); })
+      .catch((e: any) => { if (!cancelled) setErr(e.message || 'Failed to load'); })
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
+  }, [chatID]);
+
+  async function handleSave() {
+    setSaving(true); setErr(''); setSaved(false);
+    try {
+      const res = await apiUpdateGroupReminder(chatID, reminder);
+      setReminder((res as any).reminder ?? reminder);
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2500);
+    } catch (e: any) {
+      setErr(e.message || 'Failed to save');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  if (loading) return <div className="flex justify-center py-8"><LoadingSpinner size="sm" /></div>;
+
+  return (
+    <div className="space-y-5 max-w-lg">
+      {/* Description */}
+      <div className="flex items-start gap-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 rounded-xl p-4">
+        <BellRing size={18} className="text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
+        <p className="text-sm text-amber-700 dark:text-amber-300 leading-relaxed">
+          When enabled, the bot sends a WhatsApp reminder to members who still have unused attacks
+          in the current CWL war before it ends.
+        </p>
+      </div>
+
+      {/* Enable toggle */}
+      <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-4">
+        <button
+          onClick={() => setReminder((r) => ({ ...r, enabled: !r.enabled }))}
+          className="w-full flex items-center justify-between gap-3"
+        >
+          <div className="flex items-center gap-2.5">
+            <BellRing size={16} className={reminder.enabled ? 'text-indigo-500' : 'text-slate-400'} />
+            <div className="text-left">
+              <p className="text-sm font-semibold text-slate-800 dark:text-slate-200">
+                Left Attack Reminders
+              </p>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                {reminder.enabled ? 'Enabled — bot will send reminders' : 'Disabled'}
+              </p>
+            </div>
+          </div>
+          {reminder.enabled ? (
+            <ToggleRight size={28} className="text-indigo-500 flex-shrink-0" />
+          ) : (
+            <ToggleLeft size={28} className="text-slate-300 flex-shrink-0" />
+          )}
+        </button>
+      </div>
+
+      {/* Hours before end */}
+      <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-4 space-y-3">
+        <div className="flex items-center gap-2">
+          <Clock size={15} className="text-slate-400" />
+          <p className="text-sm font-semibold text-slate-700 dark:text-slate-300">Reminder Timing</p>
+        </div>
+        <p className="text-xs text-slate-500 dark:text-slate-400">
+          Send reminder this many hours before war ends.
+        </p>
+        <div className="flex items-center gap-3">
+          <input
+            type="number"
+            min={1}
+            max={24}
+            value={reminder.hoursBeforeEnd}
+            onChange={(e) => setReminder((r) => ({ ...r, hoursBeforeEnd: Math.max(1, Math.min(24, Number(e.target.value))) }))}
+            className="w-20 px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-600 text-sm text-slate-800 dark:text-slate-200 bg-white dark:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-400"
+          />
+          <span className="text-sm text-slate-500">hours before war ends</span>
+        </div>
+      </div>
+
+      {/* Custom message */}
+      <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-4 space-y-3">
+        <p className="text-sm font-semibold text-slate-700 dark:text-slate-300">Custom Message (optional)</p>
+        <p className="text-xs text-slate-500 dark:text-slate-400">
+          Leave blank to use the default reminder message. The bot will mention the user.
+        </p>
+        <textarea
+          value={reminder.message}
+          onChange={(e) => setReminder((r) => ({ ...r, message: e.target.value }))}
+          placeholder="e.g. ⚔️ You still have attacks left in the CWL war!"
+          rows={3}
+          className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-600 text-sm text-slate-800 dark:text-slate-200 bg-slate-50 dark:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-400 resize-none"
+        />
+      </div>
+
+      {err && <p className="text-sm text-red-500">{err}</p>}
+
+      <div className="flex items-center gap-3">
+        <button
+          onClick={handleSave}
+          disabled={saving}
+          className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold disabled:opacity-50 transition-colors"
+        >
+          {saving ? <RefreshCw size={14} className="animate-spin" /> : <CheckSquare size={14} />}
+          {saving ? 'Saving…' : 'Save Settings'}
+        </button>
+        {saved && (
+          <span className="flex items-center gap-1 text-sm text-emerald-600 dark:text-emerald-400 font-medium">
+            <CheckCircle size={14} /> Saved!
+          </span>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ─── GroupTabbedView ──────────────────────────────────────────────────────────
 
 function GroupTabbedView({
@@ -1322,21 +1530,26 @@ function GroupTabbedView({
   filterMembers: (members: GroupMember[]) => GroupMember[];
   onPlayerClick: (tag: string, data: PlayerData | null) => void;
 }) {
-  const [tab, setTab] = useState<'members' | 'session'>('members');
+  const [tab, setTab] = useState<'members' | 'session' | 'logs' | 'reminders'>('members');
   const [expandedKey, setExpandedKey] = useState<string | null>(null);
   const filtered = useMemo(() => filterMembers(group.resolvedMembers), [group.resolvedMembers, filter]);
 
   return (
     <div className="space-y-4">
       {/* Pill tab bar */}
-      <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800/80 rounded-2xl p-1 w-fit shadow-inner">
-        {(['members', 'session'] as const).map((t) => (
+      <div className="flex flex-wrap items-center gap-1 bg-slate-100 dark:bg-slate-800/80 rounded-2xl p-1 w-fit shadow-inner">
+        {([
+          { key: 'members',   label: `👥 Members (${filtered.length})` },
+          { key: 'session',   label: '⚔️ CWL Session' },
+          { key: 'logs',      label: '📋 Linking Logs' },
+          { key: 'reminders', label: '🔔 Reminders' },
+        ] as const).map(({ key, label }) => (
           <button
-            key={t}
-            onClick={() => setTab(t)}
+            key={key}
+            onClick={() => setTab(key)}
             className="relative px-4 py-2 rounded-xl text-xs font-bold transition-colors"
           >
-            {tab === t && (
+            {tab === key && (
               <motion.div
                 layoutId="activeTab"
                 className="absolute inset-0 bg-white dark:bg-slate-700 rounded-xl shadow-sm"
@@ -1344,11 +1557,11 @@ function GroupTabbedView({
               />
             )}
             <span className={`relative z-10 transition-colors ${
-              tab === t
+              tab === key
                 ? 'text-indigo-600 dark:text-indigo-400'
                 : 'text-slate-500 dark:text-slate-400'
             }`}>
-              {t === 'members' ? `👥 Members (${filtered.length})` : '⚔️ CWL Session'}
+              {label}
             </span>
           </button>
         ))}
@@ -1358,10 +1571,10 @@ function GroupTabbedView({
       <AnimatePresence mode="wait">
         <motion.div
           key={tab}
-          initial={{ opacity: 0, x: tab === 'members' ? -12 : 12 }}
-          animate={{ opacity: 1, x: 0 }}
-          exit={{ opacity: 0, x: tab === 'members' ? 12 : -12 }}
-          transition={{ duration: 0.18, ease: 'easeOut' }}
+          initial={{ opacity: 0, y: 6 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -6 }}
+          transition={{ duration: 0.15, ease: 'easeOut' }}
         >
           {tab === 'members' && (
             <>
@@ -1416,6 +1629,14 @@ function GroupTabbedView({
               resolvedMembers={group.resolvedMembers}
               clanInfoMap={clanInfoMap}
             />
+          )}
+
+          {tab === 'logs' && (
+            <GroupLinkLogsPanel chatID={group.chatID} />
+          )}
+
+          {tab === 'reminders' && (
+            <GroupReminderPanel chatID={group.chatID} />
           )}
         </motion.div>
       </AnimatePresence>

@@ -216,6 +216,26 @@ export async function apiGenerateGroupOtp(chatID: string) {
   }>(`/admin/groups/${encodeURIComponent(chatID)}/generate-otp`, { method: 'POST' });
 }
 
+export async function apiGetGroupLinkLogs(chatID: string) {
+  return apiFetch<{ logs: any[] }>(`/admin/groups/${encodeURIComponent(chatID)}/link-logs`);
+}
+
+export async function apiGetGroupReminder(chatID: string) {
+  return apiFetch<{ reminder: { enabled: boolean; hoursBeforeEnd: number; message: string } }>(
+    `/admin/groups/${encodeURIComponent(chatID)}/reminder`
+  );
+}
+
+export async function apiUpdateGroupReminder(
+  chatID: string,
+  config: { enabled: boolean; hoursBeforeEnd: number; message: string }
+) {
+  return apiFetch<{ success: boolean; reminder: any }>(
+    `/admin/groups/${encodeURIComponent(chatID)}/reminder`,
+    { method: 'PUT', body: JSON.stringify(config) }
+  );
+}
+
 // ── Admin: Group CWL session ──
 
 export async function apiGetGroupSession(chatID: string) {

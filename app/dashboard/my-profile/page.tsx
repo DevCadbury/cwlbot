@@ -300,7 +300,7 @@ export default function MyClansPage() {
   const [userClans, setUserClans]       = useState<any[]>([]);
   const [linkedPlayers, setLinkedPlayers] = useState<any[]>([]);
   const [enrichedPlayerMap, setEnrichedPlayerMap] = useState<Record<string, any>>({});
-  const [myGroup, setMyGroup]           = useState<any>(null);
+  const [myGroups, setMyGroups]         = useState<any[]>([]);
   const [loading, setLoading]           = useState(true);
   const [syncing, setSyncing]           = useState(false);
   const [lastSynced, setLastSynced]     = useState<Date | null>(null);
@@ -335,7 +335,7 @@ export default function MyClansPage() {
       ]);
       setUserClans(clansRes.userClans || []);
       setLinkedPlayers(playersRes.linkedPlayers || []);
-      setMyGroup((groupRes as any)?.groups?.[0] ?? null);
+      setMyGroups((groupRes as any)?.groups ?? []);
     } catch (e) {
       console.error(e);
     } finally {
@@ -645,50 +645,125 @@ export default function MyClansPage() {
         </div>
       )}
 
-      {/* Verified Group Profile */}
-      {myGroup && (
-        <div className={`rounded-2xl border-2 overflow-hidden ${
-          myGroup.isVerified ? 'border-indigo-100' : 'border-amber-100'
-        }`}>
-          <div className={`px-5 py-4 ${
-            myGroup.isVerified
-              ? 'bg-gradient-to-r from-indigo-600 to-purple-700'
-              : 'bg-gradient-to-r from-amber-500 to-orange-500'
-          } relative overflow-hidden`}>
-            <div className="absolute -top-8 -right-8 w-28 h-28 rounded-full bg-white/10 pointer-events-none" />
-            <div className="relative flex items-start justify-between gap-3">
-              <div className="min-w-0">
-                <div className="flex items-center gap-2">
-                  <MessageSquare size={16} className="text-white/80 flex-shrink-0" />
-                  <h2 className="font-bold text-white text-base truncate">
-                    {myGroup.displayTitle || myGroup.botChatName || myGroup.title || myGroup.chatID}
-                  </h2>
-                  {myGroup.isVerified ? (
-                    <span className="inline-flex items-center gap-1 text-[10px] bg-white/25 text-white px-2 py-0.5 rounded-full font-bold uppercase flex-shrink-0">
-                      <CheckCircle size={8} /> Verified Group
-                    </span>
-                  ) : (
-                    <span className="inline-flex items-center gap-1 text-[10px] bg-white/25 text-white px-2 py-0.5 rounded-full font-bold uppercase flex-shrink-0">
-                      <XCircle size={8} /> Unverified
-                    </span>
-                  )}
+      {/* Verified Groups — one card per group */}
+      {myGroups.length > 0 && (
+        <div className="space-y-4">
+          <h2 className="text-lg font-semibold text-slate-800 flex items-center gap-2">
+            <MessageSquare className="w-4 h-4 text-indigo-500" /> Verified WhatsApp Groups
+            <span className="text-xs font-normal text-slate-400 ml-1">({myGroups.length})</span>
+          </h2>
+          {myGroups.map((grp: any) => {
+            // Find current user in this group's resolved members
+            const myMember = grp.resolvedMembers?.find((m: any) => m.phone === user?.phone);
+            const myPlayers: any[] = myMember?.enrichedPlayers ?? [];
+            const myClans: any[] = myMember?.userClans ?? [];
+
+            return (
+              <div
+                key={grp.chatID}
+                className={`rounded-2xl border-2 overflow-hidden ${
+                  grp.isVerified ? 'border-indigo-100' : 'border-amber-100'
+                }`}
+              >
+                {/* Group header */}
+                <div className={`px-5 py-4 ${
+                  grp.isVerified
+                    ? 'bg-gradient-to-r from-indigo-600 to-purple-700'
+                    : 'bg-gradient-to-r from-amber-500 to-orange-500'
+                } relative overflow-hidden`}>
+                  <div className="absolute -top-8 -right-8 w-28 h-28 rounded-full bg-white/10 pointer-events-none" />
+                  <div className="relative flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2">
+                        <MessageSquare size={16} className="text-white/80 flex-shrink-0" />
+                        <h3 className="font-bold text-white text-base truncate">
+                          {grp.displayTitle || grp.botChatName || grp.title || grp.chatID}
+                        </h3>
+                        {grp.isVerified ? (
+                          <span className="inline-flex items-center gap-1 text-[10px] bg-white/25 text-white px-2 py-0.5 rounded-full font-bold uppercase flex-shrink-0">
+                            <CheckCircle size={8} /> Verified
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 text-[10px] bg-white/25 text-white px-2 py-0.5 rounded-full font-bold uppercase flex-shrink-0">
+                            <XCircle size={8} /> Unverified
+                          </span>
+                        )}
+                      </div>
+                      <code className="text-xs font-mono text-white/60 mt-1 block">{grp.chatID}</code>
+                    </div>
+                  </div>
                 </div>
-                <code className="text-xs font-mono text-white/60 mt-1 block">{myGroup.chatID}</code>
+
+                {/* Stats row */}
+                <div className="flex bg-white border-t border-slate-100">
+                  {[
+                    { label: 'WA Members', value: grp.totalParticipants ?? '-' },
+                    { label: 'Tracked', value: grp.resolvedMembers?.length ?? '-' },
+                    { label: 'CoC Linked', value: grp.resolvedMembers?.filter((m: any) => (m.enrichedPlayers || []).length > 0).length ?? '-' },
+                  ].map(({ label, value }, i) => (
+                    <div key={label} className={`flex-1 px-4 py-3 text-center ${i > 0 ? 'border-l border-slate-100' : ''}`}>
+                      <p className="text-lg font-bold text-slate-800 leading-none">{value}</p>
+                      <p className="text-[11px] text-slate-400 mt-1">{label}</p>
+                    </div>
+                  ))}
+                </div>
+
+                {/* My players in this group */}
+                {myPlayers.length > 0 && (
+                  <div className="bg-slate-50 border-t border-slate-100 px-4 py-3">
+                    <p className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-2">
+                      My Players in this Group
+                    </p>
+                    <div className="space-y-1.5">
+                      {myPlayers.map((ep: any) => {
+                        const pd = ep.playerData;
+                        const th = pd?.townHallLevel ?? 0;
+                        return (
+                          <div key={ep.playerTag} className="flex items-center gap-2.5 bg-white rounded-xl border border-slate-200 px-3 py-2">
+                            {th > 0 ? (
+                              <img src={`/townhalls/th-${th}.png`} alt={`TH${th}`} className="w-7 h-7 object-contain flex-shrink-0" />
+                            ) : (
+                              <div className="w-7 h-7 rounded-full bg-slate-100 flex items-center justify-center flex-shrink-0">
+                                <User className="w-3.5 h-3.5 text-slate-400" />
+                              </div>
+                            )}
+                            <div className="flex-1 min-w-0">
+                              <p className="font-medium text-slate-800 text-sm truncate">{pd?.name ?? ep.playerTag}</p>
+                              <p className="text-[10px] text-slate-400 font-mono">{ep.playerTag}</p>
+                            </div>
+                            {pd?.trophies != null && (
+                              <span className="flex items-center gap-0.5 text-amber-500 text-xs font-semibold">
+                                <Trophy className="w-3 h-3" /> {pd.trophies.toLocaleString()}
+                              </span>
+                            )}
+                            {pd?.clan?.badgeUrl && (
+                              <img src={pd.clan.badgeUrl} alt="clan" className="w-5 h-5 object-contain" />
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* My clans in this group */}
+                {myClans.length > 0 && (
+                  <div className="bg-slate-50 border-t border-slate-100 px-4 py-3">
+                    <p className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-2">
+                      My Clans in this Group
+                    </p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {myClans.map((c: any) => (
+                        <span key={c.clanTag} className="text-xs bg-indigo-50 text-indigo-700 border border-indigo-200 px-2 py-0.5 rounded-full font-mono">
+                          {c.clanTag}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
-            </div>
-          </div>
-          <div className="flex bg-white border-t border-slate-100">
-            {[
-              { label: 'WA Members', value: myGroup.totalParticipants ?? '-' },
-              { label: 'Tracked', value: myGroup.resolvedMembers?.length ?? '-' },
-              { label: 'CoC Linked', value: myGroup.resolvedMembers?.filter((m: any) => (m.enrichedPlayers || []).length > 0).length ?? '-' },
-            ].map(({ label, value }, i) => (
-              <div key={label} className={`flex-1 px-4 py-3 text-center ${i > 0 ? 'border-l border-slate-100' : ''}`}>
-                <p className="text-lg font-bold text-slate-800 leading-none">{value}</p>
-                <p className="text-[11px] text-slate-400 mt-1">{label}</p>
-              </div>
-            ))}
-          </div>
+            );
+          })}
         </div>
       )}
 
